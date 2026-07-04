@@ -59,6 +59,12 @@ link bash/.bashrc      "$HOME/.bashrc"
 link vim/.vimrc        "$HOME/.vimrc"
 link git/.gitconfig    "$HOME/.gitconfig"
 
+# swaybar reads its status line from bin/status.sh; re-assert the executable bit
+# so a stray checkout that dropped it can't leave the bar blank. sway/config
+# points at ~/fedora-asahi/bin/status.sh.
+chmod +x "$REPO_DIR/bin/status.sh"
+ok "bin/status.sh is executable"
+
 # --- 4. Audio services -------------------------------------------------------
 step "Enabling audio services (pipewire / wireplumber)"
 systemctl --user enable --now pipewire       || true

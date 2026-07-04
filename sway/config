@@ -93,9 +93,5 @@ default_border pixel 2
 ### Status bar (built-in swaybar, no waybar)
 bar {
     position top
-    status_command while true; do \
-        bat=$(cat /sys/class/power_supply/macsmc-battery/capacity 2>/dev/null || echo '?'); \
-        echo "$(date '+%d.%m %H:%M') | bat ${bat}%"; \
-        sleep 30; \
-    done
+    status_command ~/fedora-asahi/bin/status.sh
 }

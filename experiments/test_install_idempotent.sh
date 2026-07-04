@@ -51,4 +51,10 @@ assert_link ".bashrc"                   "bash/.bashrc"
 assert_link ".vimrc"                    "vim/.vimrc"
 assert_link ".gitconfig"                "git/.gitconfig"
 
+echo "== Verifying swaybar status script =="
+[[ -x "$REPO_DIR/bin/status.sh" ]] \
+    || { echo "FAIL: bin/status.sh is not executable"; exit 1; }
+grep -q 'status_command ~/fedora-asahi/bin/status.sh' "$REPO_DIR/sway/config" \
+    || { echo "FAIL: sway/config does not point status_command at bin/status.sh"; exit 1; }
+
 echo "PASS: install.sh is idempotent and all dotfiles are symlinks into the repo"
