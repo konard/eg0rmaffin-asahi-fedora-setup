@@ -16,7 +16,8 @@ sudo reboot
 
 The latest Asahi drivers (kernel + mesa) are required before installing Steam,
 so bring the system fully up to date and reboot into the new kernel first.
-`install.sh` itself never performs upgrades.
+`install.sh` performs no upgrade by default; pass `--upgrade` (see below) if you
+want it to run this step for you with mirror-hardened download settings.
 
 ## Install
 
@@ -28,6 +29,25 @@ cd ~/fedora-asahi && ./install.sh
 
 `install.sh` is fully idempotent — safe to re-run whenever you add a package to
 the list.
+
+### Optional: `--upgrade`
+
+By default `install.sh` never upgrades the system (offline-first). If you want
+it to bring the system fully up to date first, pass `--upgrade`:
+
+```
+./install.sh --upgrade
+```
+
+This runs a full `dnf upgrade --refresh` before the normal flow, with download
+settings hardened against flaky mirrors (`max_parallel_downloads=2`,
+`retries=10`, `timeout=120`) and up to 3 attempts. Because dnf downloads every
+package before touching the rpm transaction, a mid-download failure leaves the
+system consistent and retrying is cheap. If all attempts fail the script stops
+with a clear error (nothing is installed). After a successful upgrade it runs
+`dnf check` (informational) and, if a newer kernel than the running one was
+installed, recommends a reboot. Without the flag, behaviour is unchanged — no
+upgrade is attempted.
 
 ## Post-install
 
