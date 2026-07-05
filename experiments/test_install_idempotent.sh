@@ -26,7 +26,7 @@ done
 
 run() {
     env PATH="$FAKE_BIN:$PATH" HOME="$FAKE_HOME" USER="tester" \
-        bash "$REPO_DIR/install.sh" >"$WORK/run.log" 2>&1
+        bash "$REPO_DIR/install.sh" "$@" >"$WORK/run.log" 2>&1
 }
 
 assert_link() {
@@ -43,6 +43,10 @@ run || { echo "FAIL: first run exited non-zero"; cat "$WORK/run.log"; exit 1; }
 echo "== Second run (idempotency) =="
 run || { echo "FAIL: second run exited non-zero"; cat "$WORK/run.log"; exit 1; }
 
+echo "== Run with --upgrade (idempotent, twice) =="
+run --upgrade || { echo "FAIL: --upgrade run exited non-zero"; cat "$WORK/run.log"; exit 1; }
+run --upgrade || { echo "FAIL: second --upgrade run exited non-zero"; cat "$WORK/run.log"; exit 1; }
+
 echo "== Verifying symlinks =="
 assert_link ".config/sway/config"       "sway/config"
 assert_link ".config/foot/foot.ini"     "foot/foot.ini"
@@ -54,7 +58,7 @@ assert_link ".gitconfig"                "git/.gitconfig"
 echo "== Verifying swaybar status script =="
 [[ -x "$REPO_DIR/bin/status.sh" ]] \
     || { echo "FAIL: bin/status.sh is not executable"; exit 1; }
-grep -q 'status_command ~/fedora-asahi/bin/status.sh' "$REPO_DIR/sway/config" \
+grep -q 'status_command .*~/fedora-asahi/bin/status.sh' "$REPO_DIR/sway/config" \
     || { echo "FAIL: sway/config does not point status_command at bin/status.sh"; exit 1; }
 
 echo "PASS: install.sh is idempotent and all dotfiles are symlinks into the repo"
