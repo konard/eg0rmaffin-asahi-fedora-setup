@@ -29,7 +29,7 @@ bindsym $mod+f exec thunar
 bindsym $mod+Shift+f fullscreen
 
 # Reload / exit
-bindsym $mod+Shift+c reload
+bindsym $mod+Shift+r reload
 bindsym $mod+Shift+e exec swaymsg exit
 
 # Focus (arrows + vim keys)
@@ -93,5 +93,7 @@ default_border pixel 2
 ### Status bar (built-in swaybar, no waybar)
 bar {
     position top
-    status_command ~/fedora-asahi/bin/status.sh
+    # Invoked via `bash` explicitly so a missing exec bit can never break the
+    # bar again ("error reading from status command").
+    status_command bash ~/fedora-asahi/bin/status.sh
 }

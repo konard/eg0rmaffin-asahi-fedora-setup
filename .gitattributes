@@ -1,0 +1,3 @@
+# Normalize all text files to LF on checkout/commit so shell scripts never gain
+# CRLF endings (which break shebangs and swaybar's status_command).
+* text eol=lf
