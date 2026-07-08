@@ -178,6 +178,7 @@ sudo dnf install -y \
     google-noto-sans-fonts google-noto-sans-mono-fonts google-noto-emoji-fonts \
     firefox \
     telegram-desktop \
+    fastfetch \
     vim git htop unzip wget jq
 ok "packages installed"
 
