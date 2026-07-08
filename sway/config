@@ -17,9 +17,11 @@ set $menu fuzzel
 output eDP-1 scale 2
 
 ### Input (declarative — replaces setxkbmap / xinput)
+# No xkb grp: toggle — switching is bound explicitly below to Cmd+Shift
+# ($mod+Shift), matching the Karabiner setup on macOS. There is no Alt on this
+# keyboard, so grp:alt_shift_toggle was dead weight and is intentionally gone.
 input type:keyboard {
     xkb_layout us,ru
-    xkb_options grp:alt_shift_toggle
 }
 input type:touchpad {
     natural_scroll enabled
@@ -92,6 +94,14 @@ bindsym XF86MonBrightnessDown exec brightnessctl set 10%-
 
 # Screenshot (region -> clipboard)
 bindsym $mod+Shift+s exec grim -g "$(slurp)" - | wl-copy
+
+# Keyboard layout toggle (us <-> ru) on Cmd+Shift ($mod+Shift).
+# --release fires only when the combo is released *without* a third key, so
+# press-and-complete chords like $mod+Shift+q (kill) or $mod+Shift+<digit>
+# (move container) run their action and do NOT also toggle the layout. Both
+# Shift keys are bound so either side of the keyboard works, same as Karabiner.
+bindsym --release $mod+Shift_L exec swaymsg 'input type:keyboard xkb_switch_layout next'
+bindsym --release $mod+Shift_R exec swaymsg 'input type:keyboard xkb_switch_layout next'
 
 ### Appearance
 default_border pixel 2

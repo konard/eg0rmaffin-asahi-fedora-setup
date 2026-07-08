@@ -179,6 +179,7 @@ sudo dnf install -y \
     firefox \
     telegram-desktop \
     fastfetch \
+    widevine-installer \
     vim git htop unzip wget jq
 ok "packages installed"
 

@@ -90,9 +90,40 @@ The install mirrors dnf semantics:
 installing, launch happ, add your subscription manually, and prefer **TUN mode**
 so console tools (`dnf`, `curl`, …) tunnel through it too.
 
+> **TUN stack on Asahi: set it to `gvisor` in Happ settings.** The `system`
+> stack does not pass traffic on Asahi's 16K page-size kernel; `gvisor` works.
+
 > A full `dnf upgrade` — including `fedora-cisco-openh264` — reaches its mirrors
 > from RU networks only through the tunnel. Either run happ in TUN mode first,
 > or upgrade with `--disablerepo=fedora-cisco-openh264`.
+
+## Widevine (DRM streaming: Kinopoisk, Netflix, …)
+
+Streaming DRM needs Google's Widevine CDM, which Google does not ship for Linux
+aarch64. Fedora Asahi provides `widevine-installer` (in the package list above),
+which extracts the ARM blob from a ChromeOS recovery image.
+
+The installer is **interactive** (it prompts you to accept Google's EULA), so
+`install.sh` does not run it. Run it once by hand:
+
+```
+sudo widevine-installer
+```
+
+Then restart Firefox and allow DRM playback for the site when prompted.
+
+## Keyboard layout (us/ru)
+
+Layout switching is bound directly in sway to **Cmd+Shift** (`$mod+Shift`),
+matching the Karabiner setup on macOS — press and release both keys without a
+third key to toggle `us` <-> `ru`. Chords like `$mod+Shift+q` still run their
+action without toggling. The active layout shows on the right of the bar as
+`EN` / `RU`.
+
+> The Mac **globe key** (🌐) is not bound: on Asahi it behaves as a pure `Fn`
+> modifier handled in the keyboard driver, below the Wayland input stack, so it
+> emits no keysym sway can bind (check with `wev` if yours differs). Use
+> Cmd+Shift to switch layouts.
 
 ## Post-install
 
