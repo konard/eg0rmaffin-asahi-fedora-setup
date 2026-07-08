@@ -110,7 +110,63 @@ if (( DO_UPGRADE )); then
     fi
 fi
 
-# --- 1. Packages -------------------------------------------------------------
+# --- 1. RPM Fusion (free) ----------------------------------------------------
+# telegram-desktop lives in RPM Fusion (free), so enable that repo first.
+# Only the *free* repo — no nonfree, no other third-party packages for now.
+#
+# CRITICAL: Steam and the whole x86 emulation stack (FEX + muvm + mesa/Vulkan)
+# MUST keep coming from the Fedora/Asahi repos, never from RPM Fusion. RPM Fusion
+# ships its own steam package; if dnf ever preferred it, a future upgrade could
+# swap Steam (and drag in incompatible mesa bits) and break the Asahi emulation
+# stack. We therefore pin `excludepkgs=steam*` into every rpmfusion-free* repo
+# section so those repos can never provide steam. `dnf info steam` must always
+# resolve to the Asahi/Fedora repo.
+
+# Idempotent: only fetches the release RPM if it isn't installed yet.
+step "Enabling RPM Fusion (free)"
+if rpm -q rpmfusion-free-release >/dev/null 2>&1; then
+    ok "rpmfusion-free-release already installed"
+else
+    sudo dnf install -y \
+        "https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm"
+    ok "rpmfusion-free-release installed"
+fi
+
+# Add `excludepkgs=steam*` to each section of the rpmfusion-free* repo files so
+# the guard survives future upgrades. Implemented with awk (no config-manager
+# dependency, works on both dnf4 and dnf5) and idempotent: a section that
+# already excludes steam is left untouched, so re-runs never duplicate the line.
+guard_steam_exclude() {
+    local file="$1"
+    [[ -f "$file" ]] || return 0
+    local tmp
+    tmp="$(mktemp)"
+    # Append `excludepkgs=steam*` just before the next section header (or EOF)
+    # for any section that doesn't already have an exclude/excludepkgs line.
+    awk '
+        /^[[:space:]]*\[/ {
+            if (in_section && !has_exclude) print "excludepkgs=steam*"
+            in_section = 1; has_exclude = 0
+        }
+        /^[[:space:]]*(exclude|excludepkgs)[[:space:]]*=/ { has_exclude = 1 }
+        { print }
+        END { if (in_section && !has_exclude) print "excludepkgs=steam*" }
+    ' "$file" > "$tmp"
+    if ! cmp -s "$file" "$tmp"; then
+        sudo cp "$tmp" "$file"
+        ok "pinned excludepkgs=steam* in $(basename "$file")"
+    else
+        ok "$(basename "$file") already excludes steam"
+    fi
+    rm -f "$tmp"
+}
+
+step "Guarding Steam against RPM Fusion (excludepkgs=steam*)"
+for repo in /etc/yum.repos.d/rpmfusion-free*.repo; do
+    guard_steam_exclude "$repo"
+done
+
+# --- 2. Packages -------------------------------------------------------------
 step "Installing packages (dnf install -y)"
 sudo dnf install -y \
     sway swaybg swaylock swayidle xorg-x11-server-Xwayland \
@@ -121,17 +177,19 @@ sudo dnf install -y \
     brightnessctl \
     google-noto-sans-fonts google-noto-sans-mono-fonts google-noto-emoji-fonts \
     firefox \
+    telegram-desktop \
     vim git htop unzip wget
 ok "packages installed"
 
-# --- 2. Steam ----------------------------------------------------------------
+# --- 3. Steam ----------------------------------------------------------------
 # Comes from the Asahi repos included in the Remix and pulls the whole x86
-# emulation stack (FEX + muvm + Vulkan) automatically. No RPM Fusion / COPR / Flatpak.
+# emulation stack (FEX + muvm + Vulkan) automatically — never from RPM Fusion
+# (pinned out above via excludepkgs=steam*), no COPR, no Flatpak.
 step "Installing Steam (sudo dnf install -y steam)"
 sudo dnf install -y steam
 ok "steam installed"
 
-# --- 3. Symlinks -------------------------------------------------------------
+# --- 4. Symlinks -------------------------------------------------------------
 # link <source-in-repo> <target-in-home>
 link() {
     local src="$REPO_DIR/$1"
@@ -163,20 +221,20 @@ for script in "$REPO_DIR"/bin/*; do
     link "bin/$(basename "$script")" "$HOME/.local/bin/$(basename "$script")"
 done
 
-# --- 4. Audio services -------------------------------------------------------
+# --- 5. Audio services -------------------------------------------------------
 step "Enabling audio services (pipewire / wireplumber)"
 systemctl --user enable --now pipewire       || true
 systemctl --user enable --now wireplumber    || true
 systemctl --user enable --now pipewire-pulse || true
 ok "audio services requested"
 
-# --- 5. Groups ---------------------------------------------------------------
+# --- 6. Groups ---------------------------------------------------------------
 # brightnessctl needs the 'video' group to adjust backlight without root.
 step "Adding $USER to the 'video' group (for brightnessctl)"
 sudo usermod -aG video "$USER"
 ok "usermod done (re-login required for group change to take effect)"
 
-# --- 6. Done -----------------------------------------------------------------
+# --- 7. Done -----------------------------------------------------------------
 step "Setup complete"
 
 # Re-surface the upgrade failure so it can't be missed under the install output.

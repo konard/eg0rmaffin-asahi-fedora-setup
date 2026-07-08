@@ -5,7 +5,13 @@ Minimal Fedora Asahi Remix setup: Sway + Steam for Left 4 Dead 2.
 Declarative, idempotent `install.sh` + symlinked dotfiles. Wayland-only, no
 desktop environment. Steam comes straight from the Asahi repos included in the
 Remix (`dnf install steam`), which pulls the whole x86 emulation stack
-(FEX + muvm + Vulkan) automatically — no RPM Fusion, no COPRs, no Flatpak.
+(FEX + muvm + Vulkan) automatically.
+
+The only third-party repo is RPM Fusion **free** (for `telegram-desktop`); no
+nonfree, no COPRs, no Flatpak. Steam and the emulation stack are pinned to the
+Fedora/Asahi repos: `install.sh` writes `excludepkgs=steam*` into every
+`rpmfusion-free*` repo so no upgrade can ever swap Steam (or its mesa bits) for
+RPM Fusion's build. `dnf info steam` always resolves to the Asahi/Fedora repo.
 
 ## Prerequisite (run once on a fresh system, before install.sh)
 
