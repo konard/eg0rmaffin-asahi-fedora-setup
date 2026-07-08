@@ -47,7 +47,10 @@ if [[ "$args" == *happ* ]]; then
         echo "$HAPP_INSTALLED"
         exit 0
     fi
-    echo "package happ is not installed" >&2
+    # Real rpm prints this to STDOUT (not stderr) and exits non-zero. Callers
+    # that capture the output and test string-emptiness therefore see a
+    # non-empty "version" — this reproduces the bug from issue #17.
+    echo "package happ is not installed"
     exit 1
 fi
 exit 0
