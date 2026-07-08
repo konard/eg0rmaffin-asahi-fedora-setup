@@ -70,6 +70,12 @@ post_upgrade() {
 # dnf downloads every package before touching the rpm transaction, so a
 # download-stage failure leaves the system consistent and retries are cheap
 # (dnf resumes from its package cache).
+#
+# On total failure we DO NOT abort: the upgrade (flaky mirrors) and the
+# idempotent install flow (symlinks/packages/services) are independent concerns.
+# We set UPGRADE_FAILED so the caller can continue with the rest of the flow and
+# re-surface the warning in the final summary; the function returns non-zero.
+UPGRADE_FAILED=0
 run_upgrade() {
     step "Full system upgrade (--upgrade)"
     sudo dnf clean metadata
@@ -92,13 +98,16 @@ run_upgrade() {
         fi
     done
 
-    err "system upgrade failed after $max_attempts attempts; aborting."
-    err "The upgrade did not happen. Nothing was installed; re-run once the mirrors are reachable."
-    exit 1
+    return 1
 }
 
 if (( DO_UPGRADE )); then
-    run_upgrade
+    # `set -e` would kill the script on a non-zero return; guard the call so a
+    # failed upgrade only sets the flag and lets the install flow continue.
+    if ! run_upgrade; then
+        UPGRADE_FAILED=1
+        err "system upgrade FAILED after 3 attempts — system unchanged, continuing with install flow; retry later with --upgrade"
+    fi
 fi
 
 # --- 1. Packages -------------------------------------------------------------
@@ -169,6 +178,12 @@ ok "usermod done (re-login required for group change to take effect)"
 
 # --- 6. Done -----------------------------------------------------------------
 step "Setup complete"
+
+# Re-surface the upgrade failure so it can't be missed under the install output.
+if (( UPGRADE_FAILED )); then
+    err "system upgrade FAILED after 3 attempts — system unchanged, continuing with install flow; retry later with --upgrade"
+fi
+
 printf '%s\n' "Launch the desktop with: ${GREEN}sway${RESET}   (from a tty)"
 printf '%s\n' "Remember to create ${YELLOW}~/.gitconfig.local${RESET} with your user.name and user.email:"
 printf '%s\n' "    git config --file ~/.gitconfig.local user.name  \"Your Name\""
