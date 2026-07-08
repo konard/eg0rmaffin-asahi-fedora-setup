@@ -178,7 +178,7 @@ sudo dnf install -y \
     google-noto-sans-fonts google-noto-sans-mono-fonts google-noto-emoji-fonts \
     firefox \
     telegram-desktop \
-    vim git htop unzip wget
+    vim git htop unzip wget jq
 ok "packages installed"
 
 # --- 3. Steam ----------------------------------------------------------------
@@ -189,7 +189,120 @@ step "Installing Steam (sudo dnf install -y steam)"
 sudo dnf install -y steam
 ok "steam installed"
 
-# --- 4. Symlinks -------------------------------------------------------------
+# --- 4. Happ (VLESS/Reality proxy client) ------------------------------------
+# Happ is not packaged for Fedora — we install it straight from its GitHub
+# releases, mirroring dnf semantics:
+#   * normal run  : install only if absent; if already installed, do nothing and
+#                   make ZERO network calls for happ (a plain `rpm -q` is local).
+#   * --upgrade   : resolve the latest release, compare with the installed
+#                   version and update only when the release is newer, printing
+#                   old->new. If the GitHub API is unreachable, warn and continue
+#                   (non-fatal, same spirit as the --upgrade flow above).
+#
+# CRITICAL: use the native Linux aarch64 asset ONLY. Happ is a VPN client; its
+# TUN device must run on the real kernel, so it must NOT be the x86_64 build
+# under FEX/muvm (TUN from inside a microVM won't work). The upstream release
+# ships a native aarch64 rpm (Happ.linux.arm64.rpm), so we take the rpm route:
+# `dnf install` the asset URL and track the version with `rpm -q` (no VERSION
+# file needed). The rpm installs to /opt/happ, drops /usr/bin/happ and a
+# Happ.desktop entry (so it shows up in fuzzel), and its own %post sets up the
+# happd helper used for TUN mode — we add no autostart or systemd unit of ours.
+HAPP_REPO="Happ-proxy/happ-desktop"
+HAPP_ASSET="Happ.linux.arm64.rpm"
+HAPP_API="https://api.github.com/repos/${HAPP_REPO}/releases/latest"
+
+# Installed happ version (empty when absent). Always returns 0 so a "not
+# installed" rpm exit can't trip `set -e` in the caller's command substitution.
+happ_installed_version() {
+    rpm -q --qf '%{VERSION}\n' happ 2>/dev/null | head -n1 || true
+}
+
+# Resolve the latest release from the GitHub API. Prints "<tag>\t<asset-url>" on
+# success; returns non-zero on any network/parse failure so callers can decide
+# whether that is fatal (fresh install) or just a warning (--upgrade). Prefers
+# jq (in the package list) but falls back to grep/sed so it also works before
+# the package step has run.
+happ_latest_release() {
+    local json
+    json="$(curl -fsSL --max-time 30 "$HAPP_API")" || return 1
+    local tag url
+    if command -v jq >/dev/null 2>&1; then
+        tag="$(printf '%s' "$json" | jq -r '.tag_name // empty')"
+        url="$(printf '%s' "$json" | jq -r --arg a "$HAPP_ASSET" \
+            '.assets[]? | select(.name==$a) | .browser_download_url' | head -n1)"
+    else
+        tag="$(printf '%s' "$json" \
+            | grep -o '"tag_name":[[:space:]]*"[^"]*"' | head -n1 \
+            | sed -E 's/.*"([^"]*)"[[:space:]]*$/\1/')"
+        url="$(printf '%s' "$json" \
+            | grep -o "\"browser_download_url\":[[:space:]]*\"[^\"]*${HAPP_ASSET}\"" | head -n1 \
+            | sed -E 's/.*"(https[^"]*)"[[:space:]]*$/\1/')"
+    fi
+    [[ -n "$tag" && -n "$url" ]] || return 1
+    # Compare cleanly against `rpm -q %{VERSION}` (which carries no "v" prefix);
+    # the download URL is taken verbatim from the API, so this only affects the
+    # version we display/compare, never what we fetch.
+    tag="${tag#v}"
+    printf '%s\t%s\n' "$tag" "$url"
+}
+
+install_or_upgrade_happ() {
+    # Native aarch64 only: refuse to install the x86_64 build under emulation.
+    local arch; arch="$(uname -m)"
+    if [[ "$arch" != "aarch64" && "$arch" != "arm64" ]]; then
+        warn "happ: native aarch64 asset only; host arch is $arch — skipping"
+        return 0
+    fi
+
+    local installed; installed="$(happ_installed_version)"
+
+    # Already installed and not upgrading: nothing to do, no network calls.
+    if [[ -n "$installed" && $DO_UPGRADE -eq 0 ]]; then
+        ok "happ already installed (v$installed)"
+        return 0
+    fi
+
+    # The only network call in this section — resolve the latest release.
+    local rel tag url
+    if ! rel="$(happ_latest_release)"; then
+        if [[ -n "$installed" ]]; then
+            warn "happ: GitHub API unreachable — keeping installed v$installed"
+        else
+            warn "happ: GitHub API unreachable — cannot install now; re-run later"
+        fi
+        return 0
+    fi
+    tag="${rel%%$'\t'*}"
+    url="${rel#*$'\t'}"
+
+    # Fresh install.
+    if [[ -z "$installed" ]]; then
+        step "Installing happ $tag (native aarch64 rpm)"
+        sudo dnf install -y "$url"
+        ok "happ $tag installed"
+        return 0
+    fi
+
+    # Installed + --upgrade: update only when the release is strictly newer.
+    if [[ "$installed" == "$tag" ]]; then
+        ok "happ up to date (v$installed)"
+        return 0
+    fi
+    local newest
+    newest="$(printf '%s\n%s\n' "$installed" "$tag" | sort -V | tail -n1)"
+    if [[ "$newest" == "$installed" ]]; then
+        ok "happ v$installed is newer than latest release ($tag) — keeping"
+        return 0
+    fi
+    step "Upgrading happ $installed -> $tag"
+    sudo dnf install -y "$url"
+    ok "happ upgraded $installed -> $tag"
+}
+
+step "Checking Happ (VLESS/Reality proxy client)"
+install_or_upgrade_happ
+
+# --- 5. Symlinks -------------------------------------------------------------
 # link <source-in-repo> <target-in-home>
 link() {
     local src="$REPO_DIR/$1"
@@ -221,20 +334,20 @@ for script in "$REPO_DIR"/bin/*; do
     link "bin/$(basename "$script")" "$HOME/.local/bin/$(basename "$script")"
 done
 
-# --- 5. Audio services -------------------------------------------------------
+# --- 6. Audio services -------------------------------------------------------
 step "Enabling audio services (pipewire / wireplumber)"
 systemctl --user enable --now pipewire       || true
 systemctl --user enable --now wireplumber    || true
 systemctl --user enable --now pipewire-pulse || true
 ok "audio services requested"
 
-# --- 6. Groups ---------------------------------------------------------------
+# --- 7. Groups ---------------------------------------------------------------
 # brightnessctl needs the 'video' group to adjust backlight without root.
 step "Adding $USER to the 'video' group (for brightnessctl)"
 sudo usermod -aG video "$USER"
 ok "usermod done (re-login required for group change to take effect)"
 
-# --- 7. Done -----------------------------------------------------------------
+# --- 8. Done -----------------------------------------------------------------
 step "Setup complete"
 
 # Re-surface the upgrade failure so it can't be missed under the install output.
