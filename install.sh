@@ -142,9 +142,17 @@ link git/.gitconfig    "$HOME/.gitconfig"
 
 # swaybar reads its status line from bin/status.sh; re-assert the executable bit
 # on everything under bin/ so a stray checkout that dropped it can't leave the
-# bar blank. sway/config points at ~/fedora-asahi/bin/status.sh.
+# bar blank.
 chmod +x "$REPO_DIR"/bin/*
 ok "bin/ scripts are executable"
+
+# Symlink every script under bin/ into ~/.local/bin so configs can reference a
+# stable location (~/.local/bin/status.sh) regardless of where the repo is
+# cloned. sway/config points at ~/.local/bin/status.sh, not the clone dir.
+step "Linking bin/ scripts into ~/.local/bin"
+for script in "$REPO_DIR"/bin/*; do
+    link "bin/$(basename "$script")" "$HOME/.local/bin/$(basename "$script")"
+done
 
 # --- 4. Audio services -------------------------------------------------------
 step "Enabling audio services (pipewire / wireplumber)"

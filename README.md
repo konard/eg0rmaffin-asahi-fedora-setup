@@ -23,12 +23,17 @@ want it to run this step for you with mirror-hardened download settings.
 
 ```
 sudo dnf install -y git
-git clone <repo-url> ~/fedora-asahi
-cd ~/fedora-asahi && ./install.sh
+git clone <repo-url>
+cd <cloned-dir> && ./install.sh
 ```
 
+Clone the repo anywhere you like — `install.sh` derives its own location, so the
+setup is independent of the clone path. `bin/` scripts are symlinked into
+`~/.local/bin`, and configs reference that stable location rather than the clone
+directory.
+
 `install.sh` is fully idempotent — safe to re-run whenever you add a package to
-the list.
+the list, or after moving the repo (it re-points every symlink).
 
 ### Optional: `--upgrade`
 
