@@ -62,6 +62,38 @@ successful upgrade it runs `dnf check` (informational) and, if a newer kernel
 than the running one was installed, recommends a reboot. Without the flag,
 behaviour is unchanged — no upgrade is attempted.
 
+## Happ (VLESS/Reality proxy client)
+
+[Happ](https://github.com/Happ-proxy/happ-desktop) is not packaged for Fedora,
+so `install.sh` pulls it straight from GitHub releases using the **native Linux
+aarch64** asset (`Happ.linux.arm64.rpm`). It must run natively — a VPN client's
+TUN device won't work from inside the x86 microVM (FEX/muvm), so the x86_64
+build is never used; on a non-aarch64 host the step is simply skipped.
+
+The install mirrors dnf semantics:
+
+- **`./install.sh`** — if happ is already installed, nothing happens and **no
+  happ-related network calls** are made (a plain `rpm -q happ` is local). If it
+  is absent, the script resolves the latest release via the GitHub API, then
+  `dnf install`s the aarch64 rpm. The rpm lands in `/opt/happ`, provides
+  `/usr/bin/happ`, and installs a desktop entry so **Happ shows up in fuzzel**;
+  its own post-install script sets up the `happd` helper used for TUN mode. The
+  installed version is tracked with `rpm -q` — no extra state file.
+- **`./install.sh --upgrade`** — after the system upgrade, the script also
+  checks happ: it resolves the latest release, compares it with the installed
+  version and updates only when the release is newer, printing `old -> new`. If
+  happ is already current it prints "happ up to date" and downloads nothing. If
+  the GitHub API is unreachable it warns and continues (non-fatal, same spirit
+  as the upgrade flow).
+
+**Subscription/config is your data** — the repo never touches it. After
+installing, launch happ, add your subscription manually, and prefer **TUN mode**
+so console tools (`dnf`, `curl`, …) tunnel through it too.
+
+> A full `dnf upgrade` — including `fedora-cisco-openh264` — reaches its mirrors
+> from RU networks only through the tunnel. Either run happ in TUN mode first,
+> or upgrade with `--disablerepo=fedora-cisco-openh264`.
+
 ## Post-install
 
 - Start the desktop with `sway` from a tty.
@@ -75,3 +107,5 @@ behaviour is unchanged — no upgrade is attempted.
 - Install the **native Linux** version of Left 4 Dead 2. It is a native x86
   game, so no Proton is needed.
 - x86 emulation is memory-hungry: 16 GB RAM is recommended for most games.
+- Launch **Happ** from fuzzel (or `happ` in a terminal), add your subscription,
+  and switch on TUN mode so the whole system tunnels through it.
