@@ -95,5 +95,5 @@ bar {
     position top
     # Invoked via `bash` explicitly so a missing exec bit can never break the
     # bar again ("error reading from status command").
-    status_command bash ~/fedora-asahi/bin/status.sh
+    status_command bash ~/.local/bin/status.sh
 }
