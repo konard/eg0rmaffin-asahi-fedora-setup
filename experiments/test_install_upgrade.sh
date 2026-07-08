@@ -110,18 +110,26 @@ upgrade_calls="$(grep -c 'dnf upgrade' "$DNF_LOG")"
     || { echo "FAIL: expected 3 upgrade attempts, got $upgrade_calls"; cat "$DNF_LOG"; exit 1; }
 echo "PASS: recovered on the 3rd attempt after 2 transient failures"
 
-# --- 4. All attempts fail: exit 1 -------------------------------------------
-echo "== --upgrade: exits 1 when all attempts fail =="
+# --- 4. All attempts fail: warn loudly, continue install, exit 0 -------------
+# Upgrade failure (flaky mirrors) and the idempotent install flow are
+# independent: a bad mirror day must not block symlinks/services. The script
+# must finish the rest of the flow, warn twice (at failure and in summary), and
+# still exit 0 when everything else succeeds.
+echo "== --upgrade: continues install and exits 0 when all attempts fail =="
 echo "99" >"$FAIL_COUNTER"
-if run --upgrade; then
-    echo "FAIL: --upgrade should have exited non-zero when all attempts fail"
-    cat "$WORK/run.log"; exit 1
-fi
-grep -q 'system upgrade failed after 3 attempts' "$WORK/run.log" \
-    || { echo "FAIL: missing clear failure message"; cat "$WORK/run.log"; exit 1; }
+run --upgrade || { echo "FAIL: --upgrade must NOT abort when the upgrade fails"; cat "$WORK/run.log"; exit 1; }
 attempts="$(grep -c 'dnf upgrade' "$DNF_LOG")"
 [[ "$attempts" == "3" ]] \
     || { echo "FAIL: expected 3 upgrade attempts before giving up, got $attempts"; exit 1; }
-echo "PASS: aborted with exit 1 and a clear message after 3 failed attempts"
+# The install flow must still run: package install + config symlink.
+grep -q 'dnf install -y' "$DNF_LOG" \
+    || { echo "FAIL: install flow skipped after upgrade failure"; cat "$DNF_LOG"; exit 1; }
+[[ -L "$FAKE_HOME/.config/sway/config" ]] \
+    || { echo "FAIL: config symlink not created after upgrade failure"; exit 1; }
+# The loud warning must appear twice: at the failure point and in the summary.
+warn_count="$(grep -c 'system upgrade FAILED after 3 attempts' "$WORK/run.log")"
+[[ "$warn_count" == "2" ]] \
+    || { echo "FAIL: expected the upgrade-failure warning twice, got $warn_count"; cat "$WORK/run.log"; exit 1; }
+echo "PASS: continued the install flow, warned twice, exited 0 after 3 failed attempts"
 
 echo "ALL PASS: --upgrade behaves per spec"

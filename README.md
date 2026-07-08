@@ -48,11 +48,13 @@ This runs a full `dnf upgrade --refresh` before the normal flow, with download
 settings hardened against flaky mirrors (`max_parallel_downloads=2`,
 `retries=10`, `timeout=120`) and up to 3 attempts. Because dnf downloads every
 package before touching the rpm transaction, a mid-download failure leaves the
-system consistent and retrying is cheap. If all attempts fail the script stops
-with a clear error (nothing is installed). After a successful upgrade it runs
-`dnf check` (informational) and, if a newer kernel than the running one was
-installed, recommends a reboot. Without the flag, behaviour is unchanged — no
-upgrade is attempted.
+system consistent and retrying is cheap. If all attempts fail the script prints
+a loud warning (system unchanged) and **continues with the rest of the install
+flow** — symlinks/packages/services still run — then repeats the warning in the
+final summary and exits 0; retry the upgrade later with `--upgrade`. After a
+successful upgrade it runs `dnf check` (informational) and, if a newer kernel
+than the running one was installed, recommends a reboot. Without the flag,
+behaviour is unchanged — no upgrade is attempted.
 
 ## Post-install
 

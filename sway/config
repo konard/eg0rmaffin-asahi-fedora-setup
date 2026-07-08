@@ -7,8 +7,14 @@ set $term foot
 set $menu fuzzel
 
 ### Output
-# Built-in Retina display: without scale 2 everything is microscopic.
-output * scale 2
+# Scale ONLY the built-in Retina panel; without scale 2 everything is
+# microscopic. On Apple Silicon laptops the internal display is eDP-1 (confirm
+# with `swaymsg -t get_outputs`). Using `output *` would scale every output,
+# making an external 1080p/1440p monitor comically huge.
+#
+# External monitors default to scale 1. To tune one, add its own block, e.g.:
+#   output DP-1 scale 1
+output eDP-1 scale 2
 
 ### Input (declarative — replaces setxkbmap / xinput)
 input type:keyboard {
