@@ -213,7 +213,14 @@ HAPP_API="https://api.github.com/repos/${HAPP_REPO}/releases/latest"
 
 # Installed happ version (empty when absent). Always returns 0 so a "not
 # installed" rpm exit can't trip `set -e` in the caller's command substitution.
+#
+# CRITICAL: gate on rpm's EXIT STATUS, not its stdout. `rpm -q happ` on a missing
+# package exits non-zero but still prints `package happ is not installed` to
+# stdout (see issue #17). Capturing that output and testing string-emptiness
+# would treat the absent package as installed with a bogus "version", so we must
+# ask `rpm -q happ` for presence first and only then read the version.
 happ_installed_version() {
+    rpm -q happ &>/dev/null || return 0
     rpm -q --qf '%{VERSION}\n' happ 2>/dev/null | head -n1 || true
 }
 
