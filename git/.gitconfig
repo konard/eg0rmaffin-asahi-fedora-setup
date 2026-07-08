@@ -10,3 +10,8 @@
     prompt = false
 [include]
     path = ~/.gitconfig.local
+[user]
+	email = eg0rmaffin@gmail.com
+	name = eg0rmaffin
+[url "git@github.com:"]
+	insteadOf = https://github.com/
